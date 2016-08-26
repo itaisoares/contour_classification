@@ -1,7 +1,7 @@
 """ Helper functions for experiments """
 
-from contour_classification.ShuffleLabelsOut import ShuffleLabelsOut
-import contour_classification.contour_utils as cc
+from src.ShuffleLabelsOut import ShuffleLabelsOut
+import src.contour_utils as cc
 import json
 from sklearn import metrics
 import numpy as np
@@ -97,7 +97,7 @@ def compute_all_overlaps(track_list, meltype):
 
     msg = "Generating features..."
     num_spaces = len(track_list) - len(msg)
-    print msg + ' '*num_spaces + '|'
+    print(msg + ' '*num_spaces + '|')
 
     for track in track_list:
         cdat, adat = get_data_files(track, meltype=meltype)
@@ -221,8 +221,8 @@ def get_best_threshold(y_ref, y_pred_score, plot=True):
     sample_weight[y_ref == 1] = pos_weight
     sample_weight[y_ref == 0] = neg_weight
 
-    print "max prediction value = %s" % np.max(y_pred_score)
-    print "min prediction value = %s" % np.min(y_pred_score)
+    print("max prediction value = %s" % np.max(y_pred_score))
+    print("min prediction value = %s" % np.min(y_pred_score))
 
     precision, recall, thresholds = \
             metrics.precision_recall_curve(y_ref, y_pred_score, pos_label=1,

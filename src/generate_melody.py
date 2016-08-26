@@ -1,6 +1,6 @@
 """ Module for generating melody output based on classifier scores """
 import pandas as pd
-import contour_classification.contour_utils as cc
+import src.contour_utils as cc
 import numpy as np
 import mir_eval
 
@@ -24,7 +24,7 @@ def melody_from_clf(contour_data, prob_thresh=0.5, penalty=0, method='viterbi'):
     contour_threshed = contour_data[contour_data['mel prob'] >= prob_thresh]
 
     if len(contour_threshed) == 0:
-        print "Warning: no contours above threshold."
+        print("Warning: no contours above threshold.")
         contour_times, _, _ = \
             cc.contours_from_contour_data(contour_data, n_end=4)
         step_size = 128.0/44100.0  # contour time stamp step size
@@ -81,14 +81,14 @@ def melody_from_clf(contour_data, prob_thresh=0.5, penalty=0, method='viterbi'):
     mel_dat['reidx'] = reidx
 
     if method == 'max':
-        print "using max decoding"
+        print("using max decoding")
         mel_dat.drop_duplicates(subset='reidx', take_last=True, inplace=True)
 
         mel_output = pd.Series(np.zeros(mel_time_idx.shape), index=mel_time_idx)
         mel_output.iloc[mel_dat['reidx']] = mel_dat['f0'].values
 
     else:
-        print "using viterbi decoding"
+        print("using viterbi decoding")
         duplicates = mel_dat.duplicated(subset='reidx') | \
                      mel_dat.duplicated(subset='reidx', take_last=True)
 
@@ -151,11 +151,11 @@ def score_melodies(mel_output_dict, test_annot_dict):
         melody evaluation metrics for each track
     """
     melody_scores = {}
-    print "Scoring..."
+    print("Scoring...")
     for key in mel_output_dict.keys():
-        print key
+        print(key)
         if mel_output_dict[key] is None:
-            print "skipping..."
+            print("skipping...")
             continue
         ref = test_annot_dict[key]
         est = mel_output_dict[key]

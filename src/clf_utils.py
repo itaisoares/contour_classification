@@ -32,7 +32,7 @@ def cross_val_sweep(x_train, y_train, max_search=100,
     """
     scores = []
     for max_depth in np.arange(5, max_search, step):
-        print "training with max_depth=%s" % max_depth
+        print("training with max_depth=%s" % max_depth)
         clf = RFC(n_estimators=100, max_depth=max_depth, n_jobs=-1,
                   class_weight='auto', max_features=None)
         all_scores = cross_validation.cross_val_score(clf, x_train, y_train,

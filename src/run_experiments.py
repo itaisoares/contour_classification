@@ -1,9 +1,9 @@
 """ Functions to run full experiment """
-import contour_classification.contour_utils as cc
-import contour_classification.experiment_utils as eu
-import contour_classification.mv_gaussian as mv
-import contour_classification.clf_utils as cu
-import contour_classification.generate_melody as gm
+import src.contour_utils as cc
+import src.experiment_utils as eu
+import src.mv_gaussian as mv
+import src.clf_utils as cu
+import src.generate_melody as gm
 
 import pandas as pd
 import numpy as np
@@ -38,7 +38,7 @@ def run_glassceiling_experiment(meltype):
     overlap_results = {}
 
     for track in track_list:
-        print track
+        print(track)
         cfpath, afpath = get_fpaths(track, meltype=meltype)
         overlap_results[track] = \
             cc.contour_glass_ceiling(cfpath, afpath)
@@ -48,12 +48,15 @@ def run_glassceiling_experiment(meltype):
 
 
 def run_experiments(mel_type, outdir, olaps='all', decode='viterbi'):
+    import os
 
     if not os.path.exists(outdir):
         os.mkdir(outdir)
 
+    jsonDir = os.getcwd().split("contour_classification")[0] + "contour_classification/test_data/"
+    print(jsonDir)	
     # Compute Overlap with Annotation
-    with open('melody_trackids.json', 'r') as fhandle:
+    with open(jsonDir + 'melody_trackids.json', 'r') as fhandle:
         track_list = json.load(fhandle)
     track_list = track_list['tracks']
 
@@ -66,9 +69,9 @@ def run_experiments(mel_type, outdir, olaps='all', decode='viterbi'):
 
     for train, test in splitter:
 
-        print "="*80
-        print "Processing split number %s" % split_num
-        print "="*80
+        print("="*80)
+        print("Processing split number %s" % split_num)
+        print("="*80)
 
         outdir2 = os.path.join(outdir, 'splitnum_%s' % split_num)
         if not os.path.exists(outdir2):
@@ -105,29 +108,29 @@ def run_experiments(mel_type, outdir, olaps='all', decode='viterbi'):
                 olap_list = [0.4]
 
         for olap_thresh in olap_list:
-            print '='*40
-            print "overlap threshold = %s" % olap_thresh
-            print '='*40
+            print('='*40)
+            print("overlap threshold = %s" % olap_thresh)
+            print('='*40)
 
             outdir3 = os.path.join(outdir2, 'olap_%s' % olap_thresh)
             if not os.path.exists(outdir3):
                 os.mkdir(outdir3)
             outdir3 = os.path.join(outdir3)
 
-            print "computing labels"
+            print("computing labels")
             x_train, y_train, x_valid, y_valid, \
             x_test, y_test, test_contour_dict = \
                 compute_labels(train_contour_dict, valid_contour_dict, \
                                test_contour_dict, olap_thresh)
 
-            print "scoring with multivariate gaussian"
+            print("scoring with multivariate gaussian")
             multivariate_gaussian(x_train, y_train, x_test, y_test, outdir3)
 
-            print "training and scoring classifier"
+            print("training and scoring classifier")
             clf, best_thresh = classifier(x_train, y_train, x_valid, y_valid,
                                           x_test, y_test, outdir3)
 
-            print "computing melody output"
+            print("computing melody output")
             melody_output(clf, best_thresh, decode,
                           valid_contour_dict, valid_annot_dict,
                           test_contour_dict, test_annot_dict, outdir3)
@@ -176,10 +179,10 @@ def multivariate_gaussian(x_train, y_train, x_test, y_test, outdir):
     fpath = os.path.join(outdir, 'melodiness_scores.csv')
     melodiness_scores.to_csv(fpath)
 
-    print "Melodiness best thresh = %s" % best_thresh
-    print "Melodiness max f1 score = %s" % max_fscore
-    print "overall melodiness scores:"
-    print melodiness_scores
+    print("Melodiness best thresh = %s" % best_thresh)
+    print("Melodiness max f1 score = %s" % max_fscore)
+    print("overall melodiness scores:")
+    print(melodiness_scores)
 
 
 def classifier(x_train, y_train, x_valid, y_valid, x_test, y_test, outdir):
@@ -188,7 +191,7 @@ def classifier(x_train, y_train, x_valid, y_valid, x_test, y_test, outdir):
 
     # Cross Validation
     best_depth, _, cv_plot_data = cu.cross_val_sweep(x_train, y_train)
-    print "Classifier best depth = %s" % best_depth
+    print("Classifier best depth = %s" % best_depth)
 
     cv_plot_data = pd.DataFrame(np.array(cv_plot_data).transpose(),
                                 columns=['max depth', 'accuracy', 'std'])
@@ -201,8 +204,8 @@ def classifier(x_train, y_train, x_valid, y_valid, x_test, y_test, outdir):
     # Predict and Score
     p_train, p_valid, p_test = cu.clf_predictions(x_train, x_valid, x_test, clf)
     clf_scores = cu.clf_metrics(p_train, p_test, y_train, y_test)
-    print "Classifier scores:"
-    print clf_scores
+    print("Classifier scores:")
+    print(clf_scores)
 
     # Get threshold that maximizes F1 score
     best_thresh, max_fscore, thresh_plot_data = \
@@ -224,8 +227,8 @@ def classifier(x_train, y_train, x_valid, y_valid, x_test, y_test, outdir):
     clf_fpath = os.path.join(clf_outdir, 'rf_clf.pkl')
     joblib.dump(clf, clf_fpath)
 
-    print "Classifier best threshold = %s" % best_thresh
-    print "Classifier maximum f1 score = %s" % max_fscore
+    print("Classifier best threshold = %s" % best_thresh)
+    print("Classifier maximum f1 score = %s" % max_fscore)
 
     return clf, best_thresh
 
@@ -250,10 +253,10 @@ def melody_output(clf, best_thresh, decode,
     meldir = os.path.join(meldir)
 
     # Generate melody output using predictions
-    print "Generating Validation Melodies"
+    print("Generating Validation Melodies")
     mel_valid_dict = {}
     for key in valid_contour_dict.keys():
-        print key
+        print(key)
         mel_valid_dict[key] = gm.melody_from_clf(valid_contour_dict[key],
                                                  prob_thresh=best_thresh,
                                                  method=decode)
@@ -284,10 +287,10 @@ def melody_output(clf, best_thresh, decode,
     overall_scores.describe().to_csv(score_summary)
 
     # Generate melody output using predictions
-    print "Generating Test Melodies"
+    print("Generating Test Melodies")
     mel_test_dict = {}
     for key in test_contour_dict.keys():
-        print key
+        print(key)
         mel_test_dict[key] = gm.melody_from_clf(test_contour_dict[key],
                                                 prob_thresh=best_thresh,
                                                 method=decode)
