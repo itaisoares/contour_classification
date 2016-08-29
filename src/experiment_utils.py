@@ -22,8 +22,9 @@ def create_splits(test_size=0.15):
     splitter : iterator
         iterator of train/test indices.
     """
-    index = json.load(open('medley_artist_index.json'))
-
+    jsonFile = os.getcwd().split("contour_classification")[0] + "contour_classification/test_data/medley_artist_index.json"
+    index = json.load(open(jsonFile))
+    
     mdb_files = []
     keys = []
 
