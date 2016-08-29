@@ -30,8 +30,10 @@ def run_glassceiling_experiment(meltype):
         annot_fpath = os.path.join(annot_path, annot_fname)
         return contour_fpath, annot_fpath
 
+    jsonDir = os.getcwd().split("contour_classification")[0] + "contour_classification/test_data/"
+    print(jsonDir)	
     # Compute Overlap with Annotation
-    with open('melody_trackids.json', 'r') as fhandle:
+    with open(jsonDir + 'melody_trackids.json', 'r') as fhandle:
         track_list = json.load(fhandle)
     track_list = track_list['tracks']
 
