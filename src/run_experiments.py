@@ -56,7 +56,6 @@ def run_experiments(mel_type, outdir, olaps='all', decode='viterbi'):
         os.mkdir(outdir)
 
     jsonDir = os.getcwd().split("contour_classification")[0] + "contour_classification/test_data/"
-    print(jsonDir)	
     # Compute Overlap with Annotation
     with open(jsonDir + 'melody_trackids.json', 'r') as fhandle:
         track_list = json.load(fhandle)

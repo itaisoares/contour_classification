@@ -22,6 +22,7 @@ def load_contour_data(fpath, normalize=True):
     contour_data : DataFrame
         Pandas data frame with all contour data.
     """
+    print(fpath)
     contour_data = pd.read_csv(fpath, header=None, index_col=None,
                                delimiter=',')
     del contour_data[0]  # all zeros

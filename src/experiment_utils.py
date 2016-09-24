@@ -61,7 +61,10 @@ def get_data_files(track, meltype=1):
     contours_path = "melodia_contours"
     annot_suffix = "MELODY%s.csv" % str(meltype)
     mel_dir = "MELODY%s" % str(meltype)
-    annot_path = os.path.join(os.environ['MEDLEYDB_PATH'], 'Annotations',
+    
+    print(track)
+    """os.environ['MEDLEYDB_PATH']"""
+    annot_path = os.path.join('/Volumes/Dados/MedleyDB_sample', 'Annotations',
                               'Melody_Annotations', mel_dir)
 
     contour_fname = "%s_%s" % (track, contour_suffix)
