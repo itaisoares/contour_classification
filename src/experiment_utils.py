@@ -40,6 +40,7 @@ def create_splits(test_size=0.15):
 
 
 def get_data_files(track, meltype=1):
+    import properties as prop
     """ Load all necessary data for a given track and melody type.
 
     Parameters
@@ -56,21 +57,15 @@ def get_data_files(track, meltype=1):
     adat : DataFrame
         Pandas DataFrame of annotation data.
     """
-    contour_suffix = \
-        "MIX_vamp_melodia-contours_melodia-contours_contoursall.csv"
-    contours_path = "melodia_contours"
-    annot_suffix = "MELODY%s.csv" % str(meltype)
-    mel_dir = "MELODY%s" % str(meltype)
+    contour_suffix = "_MIX_RESULT.csv"
+    contours_path = prop.contoursRoot
+    mel_dir = "MELODY%s/" % str(meltype)
+    annot_path = prop.annotationsRoot + mel_dir
+    annot_suffix = "_MELODY%s.csv" % str(meltype)
     
-    print(track)
-    """os.environ['MEDLEYDB_PATH']"""
-    annot_path = os.path.join('/Volumes/Dados/MedleyDB_sample', 'Annotations',
-                              'Melody_Annotations', mel_dir)
-
-    contour_fname = "%s_%s" % (track, contour_suffix)
-    contour_fpath = os.path.join(contours_path, contour_fname)
-    annot_fname = "%s_%s" % (track, annot_suffix)
-    annot_fpath = os.path.join(annot_path, annot_fname)
+   
+    annot_fpath = annot_path + track + annot_suffix
+    contour_fpath = contours_path + track + "/" + track + contour_suffix
 
     cdat = cc.load_contour_data(contour_fpath, normalize=True)
     adat = cc.load_annotation(annot_fpath)
@@ -104,6 +99,7 @@ def compute_all_overlaps(track_list, meltype):
     print(msg + ' '*num_spaces + '|')
 
     for track in track_list:
+        print("OII" + track)
         cdat, adat = get_data_files(track, meltype=meltype)
         dset_annot_dict[track] = adat.copy()
         dset_contour_dict[track] = cc.compute_overlap(cdat, adat)

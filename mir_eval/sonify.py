@@ -5,6 +5,8 @@ All functions return a raw signal at the specified sampling rate.
 
 import numpy as np
 from numpy.lib.stride_tricks import as_strided
+from scipy.interpolate import interp1d
+
 from . import util
 from . import chord
 
@@ -38,7 +40,8 @@ def clicks(times, fs, click=None, length=None):
         click *= np.exp(-np.arange(fs*.1)/(fs*.01))
     # Set default length
     if length is None:
-        length = times.max()*fs + click.shape[0] + 1
+        length = int(times.max()*fs + click.shape[0] + 1)
+
     # Pre-allocate click signal
     click_signal = np.zeros(length)
     # Place clicks
@@ -64,17 +67,17 @@ def time_frequency(gram, frequencies, times, fs, function=np.sin, length=None):
     ----------
     gram : np.ndarray
         ``gram[n, m]`` is the magnitude of ``frequencies[n]``
-        from ``times[n]`` to ``times[n + 1]``
+        from ``times[m]`` to ``times[m + 1]``
     frequencies : np.ndarray
         array of size ``gram.shape[0]`` denoting the frequency of
         each row of gram
-    times: np.ndarray, shape=(len(chord_labels),) or (len(chord_labels), 2)
+    times : np.ndarray, shape= ``(gram.shape[1],)`` or ``(gram.shape[1], 2)``
         Either the start time of each column in the gram,
         or the time interval corresponding to each column.
     fs : int
         desired sampling rate of the output signal
     function : function
-        function to use to synthesize notes, should be 2pi-periodic
+        function to use to synthesize notes, should be :math:`2\pi`-periodic
     length : int
         desired number of samples in the output signal,
         defaults to ``times[-1]*fs``
@@ -138,6 +141,59 @@ def time_frequency(gram, frequencies, times, fs, function=np.sin, length=None):
     # Normalize
     output /= np.abs(output).max()
     return output
+
+
+def pitch_contour(times, frequencies, fs, function=np.sin, length=None,
+                  kind='linear'):
+    '''Sonify a pitch contour.
+
+    Parameters
+    ----------
+    times : np.ndarray
+        time indices for each frequency measurement, in seconds
+
+    frequencies : np.ndarray
+        frequency measurements, in Hz.
+        Non-positive measurements will be interpreted as un-voiced samples.
+
+    fs : int
+        desired sampling rate of the output signal
+
+    function : function
+        function to use to synthesize notes, should be :math:`2\pi`-periodic
+
+    length : int
+        desired number of samples in the output signal,
+        defaults to ``max(times)*fs``
+
+    kind : str
+        Interpolation mode for the frequency estimator.
+        See: ``scipy.interpolate.interp1d`` for valid settings.
+
+    Returns
+    -------
+    output : np.ndarray
+        synthesized version of the pitch contour
+    '''
+
+    fs = float(fs)
+
+    if length is None:
+        length = int(times.max() * fs)
+
+    # Squash the negative frequencies.
+    # wave(0) = 0, so clipping here will un-voice the corresponding instants
+    frequencies = np.maximum(frequencies, 0.0)
+
+    # Build a frequency interpolator
+    f_interp = interp1d(times * fs, 2 * np.pi * frequencies / fs, kind=kind,
+                        fill_value=0.0, bounds_error=False, copy=False)
+
+    # Estimate frequency at sample points
+    f_est = f_interp(np.arange(length))
+
+    # Sonify the waveform
+    return function(np.cumsum(f_est))
 
 
 def chroma(chromagram, times, fs, **kwargs):

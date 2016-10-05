@@ -29,7 +29,7 @@ def _check_binary():
         sonic_annotator_exists = False
 
     if sonic_annotator_exists:
-        avail_plugins = subprocess.check_output(["sonic-annotator", "-l"])
+        avail_plugins = str(subprocess.check_output(["sonic-annotator", "-l"]))
         if VAMP_PLUGIN in avail_plugins:
             return True
         else:

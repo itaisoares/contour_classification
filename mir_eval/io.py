@@ -2,6 +2,7 @@
 Functions for loading in annotations from files in different formats.
 """
 
+import contextlib
 import numpy as np
 import re
 import warnings
@@ -9,6 +10,27 @@ import scipy.io.wavfile
 import six
 
 from . import util
+from . import key
+from . import tempo
+
+
+@contextlib.contextmanager
+def _open(file_or_str, **kwargs):
+    '''Either open a file handle, or use an existing file-like object.
+
+    This will behave as the `open` function if `file_or_str` is a string.
+
+    If `file_or_str` has the `read` attribute, it will return `file_or_str`.
+
+    Otherwise, an `IOError` is raised.
+    '''
+    if hasattr(file_or_str, 'read'):
+        yield file_or_str
+    elif isinstance(file_or_str, six.string_types):
+        with open(file_or_str, **kwargs) as file_desc:
+            yield file_desc
+    else:
+        raise IOError('Invalid file-or-str object: {}'.format(file_or_str))
 
 
 def load_delimited(filename, converters, delimiter=r'\s+'):
@@ -48,51 +70,33 @@ def load_delimited(filename, converters, delimiter=r'\s+'):
     # Create re object for splitting lines
     splitter = re.compile(delimiter)
 
-    # Keep track of whether we create our own file handle
-    own_fh = False
-    # If the filename input is a string, need to open it
-    if isinstance(filename, six.string_types):
-        # Remember that we need to close it later
-        own_fh = True
-        # Open the file for reading
-        input_file = open(filename, 'r')
-    # If the provided has a read attribute, we can use it as a file handle
-    elif hasattr(filename, 'read'):
-        input_file = filename
-    # Raise error otherwise
-    else:
-        raise ValueError('filename must be a string or file handle')
-
     # Note: we do io manually here for two reasons.
     #   1. The csv module has difficulties with unicode, which may lead
     #      to failures on certain annotation strings
     #
     #   2. numpy's text loader does not handle non-numeric data
     #
-    for row, line in enumerate(input_file, 1):
-        # Split each line using the supplied delimiter
-        data = splitter.split(line.strip(), n_columns - 1)
+    with _open(filename, mode='r') as input_file:
+        for row, line in enumerate(input_file, 1):
+            # Split each line using the supplied delimiter
+            data = splitter.split(line.strip(), n_columns - 1)
 
-        # Throw a helpful error if we got an unexpected # of columns
-        if n_columns != len(data):
-            raise ValueError('Expected {} columns, got {} at '
-                             '{}:{:d}:\n\t{}'.format(n_columns, len(data),
-                                                     filename, row, line))
+            # Throw a helpful error if we got an unexpected # of columns
+            if n_columns != len(data):
+                raise ValueError('Expected {} columns, got {} at '
+                                 '{}:{:d}:\n\t{}'.format(n_columns, len(data),
+                                                         filename, row, line))
 
-        for value, column, converter in zip(data, columns, converters):
-            # Try converting the value, throw a helpful error on failure
-            try:
-                converted_value = converter(value)
-            except:
-                raise ValueError("Couldn't convert value {} using {} "
-                                 "found at {}:{:d}:\n\t{}".format(
-                                     value, converter.__name__, filename, row,
-                                     line))
-            column.append(converted_value)
-
-    # Close the file handle if we opened it
-    if own_fh:
-        input_file.close()
+            for value, column, converter in zip(data, columns, converters):
+                # Try converting the value, throw a helpful error on failure
+                try:
+                    converted_value = converter(value)
+                except:
+                    raise ValueError("Couldn't convert value {} using {} "
+                                     "found at {}:{:d}:\n\t{}".format(
+                                         value, converter.__name__, filename,
+                                         row, line))
+                column.append(converted_value)
 
     # Sane output
     if n_columns == 1:
@@ -292,9 +296,9 @@ def load_patterns(filename):
             pattern = [occurrence1, ..., occurrenceM]
             pattern_list = [pattern1, ..., patternN]
 
-        where `N` is the number of patterns, `M[i]` is the number of
-        occurrences of the `i`'th pattern, and `O[j]` is the number of onsets
-        in the `j`'th occurrence.  E.g.::
+        where ``N`` is the number of patterns, ``M[i]`` is the number of
+        occurrences of the ``i`` th pattern, and ``O[j]`` is the number of
+        onsets in the ``j``'th occurrence.  E.g.::
 
             occ1 = [(0.5, 67.0), (1.0, 67.0), (1.5, 67.0), (2.0, 64.0)]
             occ2 = [(4.5, 65.0), (5.0, 65.0), (5.5, 65.0), (6.0, 62.0)]
@@ -312,60 +316,42 @@ def load_patterns(filename):
 
     """
 
-    # Keep track of whether we create our own file handle
-    own_fh = False
-    # If the filename input is a string, need to open it
-    if isinstance(filename, six.string_types):
-        # Remember that we need to close it later
-        own_fh = True
-        # Open the file for reading
-        input_file = open(filename, 'r')
-    # If the provided has a read attribute, we can use it as a file handle
-    elif hasattr(filename, 'read'):
-        input_file = filename
-    # Raise error otherwise
-    else:
-        raise ValueError('filename must be a string or file handle')
-
     # List with all the patterns
     pattern_list = []
     # Current pattern, which will contain all occs
     pattern = []
     # Current occurrence, containing (onset, midi)
     occurrence = []
-    for line in input_file.readlines():
-        if "pattern" in line:
-            if occurrence != []:
-                pattern.append(occurrence)
-            if pattern != []:
-                pattern_list.append(pattern)
-            occurrence = []
-            pattern = []
-            continue
-        if "occurrence" in line:
-            if occurrence != []:
-                pattern.append(occurrence)
-            occurrence = []
-            continue
-        string_values = line.split(",")
-        onset_midi = (float(string_values[0]), float(string_values[1]))
-        occurrence.append(onset_midi)
+    with _open(filename, mode='r') as input_file:
+        for line in input_file.readlines():
+            if "pattern" in line:
+                if occurrence != []:
+                    pattern.append(occurrence)
+                if pattern != []:
+                    pattern_list.append(pattern)
+                occurrence = []
+                pattern = []
+                continue
+            if "occurrence" in line:
+                if occurrence != []:
+                    pattern.append(occurrence)
+                occurrence = []
+                continue
+            string_values = line.split(",")
+            onset_midi = (float(string_values[0]), float(string_values[1]))
+            occurrence.append(onset_midi)
 
-    # Add last occurrence and pattern to pattern_list
-    if occurrence != []:
-        pattern.append(occurrence)
-    if pattern != []:
-        pattern_list.append(pattern)
-
-    # If we opened an input file, we need to close it
-    if own_fh:
-        input_file.close()
+        # Add last occurrence and pattern to pattern_list
+        if occurrence != []:
+            pattern.append(occurrence)
+        if pattern != []:
+            pattern_list.append(pattern)
 
     return pattern_list
 
 
 def load_wav(path, mono=True):
-    """Loads a .wav file as a numpy array using scipy.io.wavfile.
+    """Loads a .wav file as a numpy array using ``scipy.io.wavfile``.
 
     Parameters
     ----------
@@ -399,3 +385,199 @@ def load_wav(path, mono=True):
     if mono and audio_data.ndim != 1:
         audio_data = audio_data.mean(axis=1)
     return audio_data, fs
+
+
+def load_valued_intervals(filename, delimiter=r'\s+'):
+    r"""Import valued intervals from an annotation file. The file should
+    consist of three columns: Two consisting of numeric values corresponding to
+    start and end time of each interval and a third, also of numeric values,
+    corresponding to the value of each interval. This is primarily useful for
+    processing events which span a duration and have a numeric value, such as
+    piano-roll notes which have an onset, offset, and a pitch value.
+
+    Parameters
+    ----------
+    filename : str
+        Path to the annotation file
+    delimiter : str
+        Separator regular expression.
+        By default, lines will be split by any amount of whitespace.
+
+    Returns
+    -------
+    intervals : np.ndarray, shape=(n_events, 2)
+        Array of event start and end times
+    values : np.ndarray, shape=(n_events,)
+        Array of values
+
+    """
+    # Use our universal function to load in the events
+    starts, ends, values = load_delimited(filename, [float, float, float],
+                                          delimiter)
+    # Stack into an interval matrix
+    intervals = np.array([starts, ends]).T
+    # Validate them, but throw a warning in place of an error
+    try:
+        util.validate_intervals(intervals)
+    except ValueError as error:
+        warnings.warn(error.args[0])
+
+    # return values as np.ndarray
+    values = np.array(values)
+
+    return intervals, values
+
+
+def load_key(filename, delimiter=r'\s+'):
+    r"""Load key labels from an annotation file. The file should
+    consist of two string columns: One denoting the key scale degree
+    (semitone), and the other denoting the mode (major or minor).  The file
+    should contain only one row.
+
+    Parameters
+    ----------
+    filename : str
+        Path to the annotation file
+    delimiter : str
+        Separator regular expression.
+        By default, lines will be split by any amount of whitespace.
+
+    Returns
+    -------
+    key : str
+        Key label, in the form ``'(key) (mode)'``
+
+    """
+    # Use our universal function to load the key and mode strings
+    scale, mode = load_delimited(filename, [str, str], delimiter)
+    if len(scale) != 1:
+        raise ValueError('Key file should contain only one line.')
+    scale, mode = scale[0], mode[0]
+    # Join with a space
+    key_string = '{} {}'.format(scale, mode)
+    # Validate them, but throw a warning in place of an error
+    try:
+        key.validate_key(key_string)
+    except ValueError as error:
+        warnings.warn(error.args[0])
+
+    return key_string
+
+
+def load_tempo(filename, delimiter=r'\s+'):
+    r"""Load tempo estimates from an annotation file in MIREX format.
+    The file should consist of three numeric columns: the first two
+    correspond to tempo estimates (in beats-per-minute), and the third
+    denotes the relative confidence of the first value compared to the
+    second (in the range [0, 1]). The file should contain only one row.
+
+    Parameters
+    ----------
+    filename : str
+        Path to the annotation file
+    delimiter : str
+        Separator regular expression.
+        By default, lines will be split by any amount of whitespace.
+
+    Returns
+    -------
+    tempi : np.ndarray, non-negative
+        The two tempo estimates
+
+    weight : float [0, 1]
+        The relative importance of ``tempi[0]`` compared to ``tempi[1]``
+    """
+    # Use our universal function to load the key and mode strings
+    t1, t2, weight = load_delimited(filename, [float, float, float], delimiter)
+
+    weight = weight[0]
+    tempi = np.concatenate([t1, t2])
+
+    if len(t1) != 1:
+        raise ValueError('Tempo file should contain only one line.')
+
+    # Validate them, but throw a warning in place of an error
+    try:
+        tempo.validate_tempi(tempi)
+    except ValueError as error:
+        warnings.warn(error.args[0])
+
+    if not 0 <= weight <= 1:
+        raise ValueError('Invalid weight: {}'.format(weight))
+
+    return tempi, weight
+
+
+def load_ragged_time_series(filename, dtype=float, delimiter=r'\s+',
+                            header=False):
+    r"""Utility function for loading in data from a delimited time series
+    annotation file with a variable number of columns.
+    Assumes that column 0 contains time stamps and columns 1 through n contain
+    values. n may be variable from time stamp to time stamp.
+
+    Examples
+    --------
+    >>> # Load a ragged list of tab-delimited multi-f0 midi notes
+    >>> times, vals = load_ragged_time_series('multif0.txt', dtype=int,
+                                              delimiter='\t')
+    >>> # Load a raggled list of space delimited multi-f0 values with a header
+    >>> times, vals = load_ragged_time_series('labeled_events.csv',
+                                              header=True)
+
+    Parameters
+    ----------
+    filename : str
+        Path to the annotation file
+    dtype : function
+        Data type to apply to values columns.
+    delimiter : str
+        Separator regular expression.
+        By default, lines will be split by any amount of whitespace.
+    header : bool
+        Indicates whether a header row is present or not.
+        By default, assumes no header is present.
+
+    Returns
+    -------
+    times : np.ndarray
+        array of timestamps (float)
+    values : list of np.ndarray
+        list of arrays of corresponding values
+
+    """
+    # Initialize empty lists
+    times = []
+    values = []
+
+    # Create re object for splitting lines
+    splitter = re.compile(delimiter)
+
+    if header:
+        start_row = 1
+    else:
+        start_row = 0
+    with _open(filename, mode='r') as input_file:
+        for row, line in enumerate(input_file, start_row):
+            # Split each line using the supplied delimiter
+            data = splitter.split(line.strip())
+            try:
+                converted_time = float(data[0])
+            except (TypeError, ValueError) as exe:
+                six.raise_from(ValueError("Couldn't convert value {} using {} "
+                                          "found at {}:{:d}:\n\t{}".format(
+                                            data[0], float.__name__,
+                                            filename, row, line)), exe)
+            times.append(converted_time)
+
+            # cast values to a numpy array. time stamps with no values are cast
+            # to an empty array.
+            try:
+                converted_value = np.array(data[1:], dtype=dtype)
+            except (TypeError, ValueError) as exe:
+                six.raise_from(ValueError("Couldn't convert value {} using {} "
+                                          "found at {}:{:d}:\n\t{}".format(
+                                            data[1:], dtype.__name__,
+                                            filename, row, line)), exe)
+            values.append(converted_value)
+
+    return np.array(times), values

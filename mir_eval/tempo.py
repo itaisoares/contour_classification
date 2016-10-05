@@ -16,18 +16,24 @@ The weighting value from the reference must be a float in the range [0, 1].
 
 Metrics
 -------
-:func:`mir_eval.tempo.detection`
-    Relative error, hits, and weighted precision of tempo estimation.
+* :func:`mir_eval.tempo.detection`: Relative error, hits, and weighted
+  precision of tempo estimation.
 
 '''
 
 import numpy as np
 import collections
 from . import util
-import warnings
 
 
 def validate_tempi(tempi):
+    """Checks that there are two non-negative tempi.
+
+    Parameters
+    ----------
+    tempi : np.ndarray
+        length-2 array of tempo, in bpm
+    """
 
     if tempi.size != 2:
         raise ValueError('tempi must have exactly two values')
@@ -42,13 +48,13 @@ def validate(reference_tempi, reference_weight, estimated_tempi):
 
     Parameters
     ----------
-    reference_onsets : np.ndarray
+    reference_tempi : np.ndarray
         reference tempo values, in bpm
 
     reference_weight : float
         perceptual weight of slow vs fast in reference
 
-    estimated_onsets : np.ndarray
+    estimated_tempi : np.ndarray
         estimated tempo values, in bpm
 
     """
@@ -65,13 +71,14 @@ def detection(reference_tempi, reference_weight, estimated_tempi, tol=0.08):
     Parameters
     ----------
     reference_tempi : np.ndarray, shape=(2,)
-        Two non-negative reference tempi, t_1 and t_2
+        Two non-negative reference tempi
 
     reference_weight : float > 0
-        The relative strength of t_1 vs t_2 in the reference.
+        The relative strength of ``reference_tempi[0]`` vs
+        ``reference_tempi[1]``.
 
     estimated_tempi : np.ndarray, shape=(2,)
-        Two non-negative estimated tempi, r_1 and r_2.
+        Two non-negative estimated tempi.
 
     tol : float in [0, 1]:
         The maximum allowable deviation from a reference tempo to
@@ -132,14 +139,14 @@ def evaluate(reference_tempi, reference_weight, estimated_tempi, **kwargs):
     Parameters
     ----------
     reference_tempi : np.ndarray, shape=(2,)
-        Two non-negative reference tempi, t_slow and t_fast,
-        such that t_slow < t_fast.
+        Two non-negative reference tempi
 
     reference_weight : float > 0
-        The relative strength of t_slow vs t_fast in the reference.
+        The relative strength of ``reference_tempi[0]`` vs
+        ``reference_tempi[1]``.
 
     estimated_tempi : np.ndarray, shape=(2,)
-        Two non-negative estimated tempi, r_slow and r_fast.
+        Two non-negative estimated tempi.
 
     kwargs
         Additional keyword arguments which will be passed to the

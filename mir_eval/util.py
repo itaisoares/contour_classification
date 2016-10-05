@@ -3,11 +3,11 @@ This submodule collects useful functionality required across the task
 submodules, such as preprocessing, validation, and common computations.
 '''
 
-import numpy as np
 import os
+import inspect
 import six
 
-import inspect
+import numpy as np
 
 
 def index_labels(labels, case_sensitive=False):
@@ -26,7 +26,7 @@ def index_labels(labels, case_sensitive=False):
     Returns
     -------
     indices : list, shape=(n,)
-        Numerical representation of *labels*
+        Numerical representation of ``labels``
     index_to_label : dict
         Mapping to convert numerical indices back to labels.
         ``labels[i] == index_to_label[indices[i]]``
@@ -109,7 +109,8 @@ def intervals_to_samples(intervals, labels, offset=0, sample_size=0.1,
     sample_labels : list
         array of labels for each generated sample
 
-    .. note::
+    Notes
+    -----
         Intervals will be rounded down to the nearest multiple
         of ``sample_size``.
 
@@ -138,6 +139,8 @@ def interpolate_intervals(intervals, labels, time_points, fill_value=None):
         The ``i`` th interval spans time ``intervals[i, 0]`` to
         ``intervals[i, 1]``.
 
+        Intervals are assumed to be disjoint.
+
     labels : list, shape=(n,)
         The annotation for each interval
 
@@ -154,14 +157,50 @@ def interpolate_intervals(intervals, labels, time_points, fill_value=None):
         Labels corresponding to the given time points.
 
     """
+
+    # Sort the intervals by start time
+    intervals, labels = sort_labeled_intervals(intervals, labels)
+
+    start, end = intervals.min(), intervals.max()
+
     aligned_labels = []
+
     for tpoint in time_points:
-        if tpoint < intervals.min() or tpoint > intervals.max():
-            aligned_labels.append(fill_value)
-        else:
+        # This logic isn't correct if there's a gap in intervals
+        if start <= tpoint <= end:
             index = np.argmax(intervals[:, 0] > tpoint) - 1
             aligned_labels.append(labels[index])
+        else:
+            aligned_labels.append(fill_value)
     return aligned_labels
+
+
+def sort_labeled_intervals(intervals, labels=None):
+    '''Sort intervals, and optionally, their corresponding labels
+    according to start time.
+
+    Parameters
+    ----------
+    intervals : np.ndarray, shape=(n, 2)
+        The input intervals
+
+    labels : list, optional
+        Labels for each interval
+
+    Returns
+    -------
+    intervals_sorted or (intervals_sorted, labels_sorted)
+        Labels are only returned if provided as input
+    '''
+
+    idx = np.argsort(intervals[:, 0])
+
+    intervals_sorted = intervals[idx]
+
+    if labels is None:
+        return intervals_sorted
+    else:
+        return intervals_sorted, [labels[_] for _ in idx]
 
 
 def f_measure(precision, recall, beta=1.0):
@@ -239,7 +278,7 @@ def adjust_intervals(intervals,
                      t_max=None,
                      start_label='__T_MIN',
                      end_label='__T_MAX'):
-    """Adjust a list of time intervals to span the range [t_min, t_max].
+    """Adjust a list of time intervals to span the range ``[t_min, t_max]``.
 
     Any intervals lying completely outside the specified range will be removed.
 
@@ -274,9 +313,9 @@ def adjust_intervals(intervals,
     Returns
     -------
     new_intervals : np.ndarray
-        Intervals spanning [t_min, t_max]
+        Intervals spanning ``[t_min, t_max]``
     new_labels : list
-        List of labels for new_labels
+        List of labels for ``new_labels``
 
     """
 
@@ -302,10 +341,10 @@ def adjust_intervals(intervals,
             intervals = intervals[int(first_idx[0]):]
         intervals = np.maximum(t_min, intervals)
 
-        if intervals[0, 0] > t_min:
+        if intervals.min() > t_min:
             # Lowest boundary is higher than t_min:
             # add a new boundary and label
-            intervals = np.vstack(([t_min, intervals[0, 0]], intervals))
+            intervals = np.vstack(([t_min, intervals.min()], intervals))
             if labels is not None:
                 labels.insert(0, start_label)
 
@@ -323,9 +362,9 @@ def adjust_intervals(intervals,
 
         intervals = np.minimum(t_max, intervals)
 
-        if intervals[-1, -1] < t_max:
+        if intervals.max() < t_max:
             # Last boundary is below t_max: add a new boundary and label
-            intervals = np.vstack((intervals, [intervals[-1, -1], t_max]))
+            intervals = np.vstack((intervals, [intervals.max(), t_max]))
             if labels is not None:
                 labels.append(end_label)
 
@@ -334,12 +373,13 @@ def adjust_intervals(intervals,
 
 def adjust_events(events, labels=None, t_min=0.0,
                   t_max=None, label_prefix='__'):
-    """Adjust the given list of event times to span the range [t_min, t_max].
+    """Adjust the given list of event times to span the range
+    ``[t_min, t_max]``.
 
     Any event times outside of the specified range will be removed.
 
-    If the times do not span [t_min, t_max], additional events will be added
-    with the prefix ``label_prefix``.
+    If the times do not span ``[t_min, t_max]``, additional events will be
+    added with the prefix ``label_prefix``.
 
     Parameters
     ----------
@@ -424,9 +464,9 @@ def intersect_files(flist1, flist2):
     Returns
     -------
     sublist1 : list
-        subset of filepaths with matching stems from *flist1*
+        subset of filepaths with matching stems from ``flist1``
     sublist2 : list
-        corresponding filepaths from *flist2*
+        corresponding filepaths from ``flist2``
 
     """
     def fname(abs_path):
@@ -472,9 +512,9 @@ def merge_labeled_intervals(x_intervals, x_labels, y_intervals, y_labels):
     new_intervals : np.ndarray
         New interval times of the merged sequences.
     new_x_labels : list
-        New labels for the sequence *x*
+        New labels for the sequence ``x``
     new_y_labels : list
-        New labels for the sequence *y*
+        New labels for the sequence ``y``
 
     """
     align_check = [x_intervals[0, 0] == y_intervals[0, 0],
@@ -589,13 +629,60 @@ def _bipartite_match(graph):
             recurse(v)
 
 
-def match_events(ref, est, window):
+def _outer_distance_mod_n(ref, est, modulus=12):
+    """Compute the absolute outer distance modulo n.
+    Using this distance, d(11, 0) = 1 (modulo 12)
+
+    Parameters
+    ----------
+    ref : np.ndarray, shape=(n,)
+        Array of reference values.
+    est : np.ndarray, shape=(m,)
+        Array of estimated values.
+    modulus : int
+        The modulus.
+        12 by default for octave equivalence.
+
+    Returns
+    -------
+    outer_distance : np.ndarray, shape=(n, m)
+        The outer circular distance modulo n.
+
+    """
+    ref_mod_n = np.mod(ref, modulus)
+    est_mod_n = np.mod(est, modulus)
+    abs_diff = np.abs(np.subtract.outer(ref_mod_n, est_mod_n))
+    return np.minimum(abs_diff, modulus - abs_diff)
+
+
+def _outer_distance(ref, est):
+    """Compute the absolute outer distance.
+    Computes |ref[i] - est[j]| for each i and j.
+
+    Parameters
+    ----------
+    ref : np.ndarray, shape=(n,)
+        Array of reference values.
+    est : np.ndarray, shape=(m,)
+        Array of estimated values.
+
+    Returns
+    -------
+    outer_distance : np.ndarray, shape=(n, m)
+        The outer 1d-euclidean distance.
+
+    """
+    return np.abs(np.subtract.outer(ref, est))
+
+
+def match_events(ref, est, window, distance=_outer_distance):
     """Compute a maximum matching between reference and estimated event times,
     subject to a window constraint.
 
     Given two lists of event times ``ref`` and ``est``, we seek the largest set
-    of correspondences ``(ref[i], est[j])`` such that ``|ref[i] - est[j]| <=
-    window``, and each ``ref[i]`` and ``est[j]`` is matched at most once.
+    of correspondences ``(ref[i], est[j])`` such that
+    ``distance(ref[i], est[j]) <= window``, and each
+    ``ref[i]`` and ``est[j]`` is matched at most once.
 
     This is useful for computing precision/recall metrics in beat tracking,
     onset detection, and segmentation.
@@ -603,11 +690,14 @@ def match_events(ref, est, window):
     Parameters
     ----------
     ref : np.ndarray, shape=(n,)
-        Array of reference event times
+        Array of reference values
     est : np.ndarray, shape=(m,)
-        Array of estimated event times
+        Array of estimated values
     window : float > 0
         Size of the window.
+    distance : function
+        function that computes the outer distance of ref and est.
+        By default uses _outer_distance, ``|ref[i] - est[j]|``
 
     Returns
     -------
@@ -616,16 +706,18 @@ def match_events(ref, est, window):
         ``matching[i] == (i, j)`` where ``ref[i]`` matches ``est[j]``.
 
     """
+    if distance is None:
+        distance = _outer_distance
 
     # Compute the indices of feasible pairings
-    hits = np.where(np.abs(np.subtract.outer(ref, est)) <= window)
+    hits = np.where(distance(ref, est) <= window)
 
     # Construct the graph input
     G = {}
     for ref_i, est_i in zip(*hits):
-        if ref_i not in G:
-            G[ref_i] = []
-        G[ref_i].append(est_i)
+        if est_i not in G:
+            G[est_i] = []
+        G[est_i].append(ref_i)
 
     # Compute the maximum matching
     matching = sorted(_bipartite_match(G).items())
@@ -686,12 +778,51 @@ def validate_events(events, max_time=30000.):
         raise ValueError('Events should be in increasing order.')
 
 
-def has_kwargs(function):
-    r'''Determine whether a function has **kwargs.
+def validate_frequencies(frequencies, max_freq, min_freq,
+                         allow_negatives=False):
+    """Checks that a 1-d frequency ndarray is well-formed, and raises
+    errors if not.
 
     Parameters
     ----------
-    function: callable
+    frequencies : np.ndarray, shape=(n,)
+        Array of frequency values
+    max_freq : float
+        If a frequency is found above this pitch, a ValueError will be raised.
+        (Default value = 5000.)
+    min_freq : float
+        If a frequency is found below this pitch, a ValueError will be raised.
+        (Default value = 20.)
+    allow_negatives : bool
+        Whether or not to allow negative frequency values.
+    """
+    # If flag is true, map frequencies to their absolute value.
+    if allow_negatives:
+        frequencies = np.abs(frequencies)
+    # Make sure no frequency values are huge
+    if (np.abs(frequencies) > max_freq).any():
+        raise ValueError('A frequency of {} was found which is greater than '
+                         'the maximum allowable value of max_freq = {} (did '
+                         'you supply frequency values in '
+                         'Hz?)'.format(frequencies.max(), max_freq))
+    # Make sure no frequency values are tiny
+    if (np.abs(frequencies) < min_freq).any():
+        raise ValueError('A frequency of {} was found which is less than the '
+                         'minimum allowable value of min_freq = {} (did you '
+                         'supply frequency values in '
+                         'Hz?)'.format(frequencies.min(), min_freq))
+    # Make sure frequency values are 1-d np ndarrays
+    if frequencies.ndim != 1:
+        raise ValueError('Frequencies should be 1-d numpy ndarray, '
+                         'but shape={}'.format(frequencies.shape))
+
+
+def has_kwargs(function):
+    r'''Determine whether a function has \*\*kwargs.
+
+    Parameters
+    ----------
+    function : callable
         The function to test
 
     Returns
@@ -751,7 +882,7 @@ def intervals_to_durations(intervals):
     intervals : np.ndarray, shape=(n, 2)
         An array of time intervals, as returned by
         :func:`mir_eval.io.load_intervals()`.
-        The *i* th interval spans time ``intervals[i, 0]`` to
+        The ``i`` th interval spans time ``intervals[i, 0]`` to
         ``intervals[i, 1]``.
 
     Returns
@@ -762,3 +893,36 @@ def intervals_to_durations(intervals):
     """
     validate_intervals(intervals)
     return np.abs(np.diff(intervals, axis=-1)).flatten()
+
+
+def hz_to_midi(freqs):
+    '''Convert Hz to MIDI numbers
+
+    Parameters
+    ----------
+    freqs : number or ndarray
+        Frequency/frequencies in Hz
+
+    Returns
+    -------
+    midi : number or ndarray
+        MIDI note numbers corresponding to input frequencies.
+        Note that these may be fractional.
+    '''
+    return 12.0 * (np.log2(freqs) - np.log2(440.0)) + 69.0
+
+
+def midi_to_hz(midi):
+    '''Convert MIDI numbers to Hz
+
+    Parameters
+    ----------
+    midi : number or ndarray
+        MIDI notes
+
+    Returns
+    -------
+    freqs : number or ndarray
+        Frequency/frequencies in Hz corresponding to `midi`
+    '''
+    return 440.0 * (2.0 ** ((midi - 69.0)/12.0))

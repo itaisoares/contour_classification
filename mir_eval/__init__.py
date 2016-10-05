@@ -11,8 +11,11 @@ from . import separation
 from . import util
 from . import sonify
 from . import melody
+from . import multipitch
 from . import pattern
 from . import tempo
 from . import hierarchy
+from . import transcription
+from . import key
 
-__version__ = '0.2'
+__version__ = '0.4'

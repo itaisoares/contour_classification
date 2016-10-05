@@ -44,9 +44,11 @@ def process(audio_files=None, training_pairs=None, testing_pairs=None,
             audio_files
         )
 
-    # return (
-    #     train_contours, test_contours, contour_list
-    # )
+    print("TO USANDOA QUI MERMO")
+    return (
+        train_contours, contour_list
+        #train_contours, test_contours, contour_list
+    )
 
 
 def process_audio_only(contour_extractor, feature_extractor,
