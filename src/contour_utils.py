@@ -22,28 +22,46 @@ def load_contour_data(fpath, normalize=True):
     contour_data : DataFrame
         Pandas data frame with all contour data.
     """
-    print("load_contour_data")
-    print(fpath)
+    #print("contour_utils:load_contour_data")
     contour_data = pd.read_csv(fpath, header=None, index_col=None,
                                delimiter=',')
     #del contour_data[0]  # all zeros
     #del contour_data[1]  # just an unnecessary  index
-    del contour_data[12] #Y
+    #del contour_data[12] #Y
+    #print(contour_data[12])
+    #contour_data.drop(contour_data.columns[12], axis=1)
+    #print(contour_data)
     headers = contour_data.columns.values.astype('str')
-    headers[0:12] = ['onset', 'offset', 'duration', 'pitch mean', 'pitch std',
+    headers[0:13] = ['onset', 'offset', 'duration', 'pitch mean', 'pitch std',
                      'salience mean', 'salience std', 'salience tot',
-                     'vibrato', 'vib rate', 'vib extent', 'vib coverage']
+                     'vibrato', 'vib rate', 'vib extent', 'vib coverage', 'probabilidade']
     contour_data.columns = headers
+    del contour_data['probabilidade']
     contour_data.num_end_cols = 0
     contour_data['overlap'] = -1  # overlaps are unset
     contour_data['labels'] = -1  # all labels are unset
     contour_data['melodiness'] = ""
     contour_data['mel prob'] = -1
+    
+    
     contour_data.num_end_cols = 4
+    
 
     if normalize:
         contour_data = normalize_features(contour_data)
 
+    return contour_data
+
+def load_primary_contour_data(fpath):
+    contour_data = pd.read_csv(fpath, header=None, index_col=None,
+                               delimiter=',')
+ 
+    headers = contour_data.columns.values.astype('str')
+    headers[0:4] = ['zeros','time','freq','salience']
+    contour_data.columns = headers
+    del contour_data['zeros']
+    #contour_data.num_end_cols = 0
+   
     return contour_data
 
 
@@ -113,15 +131,6 @@ def contours_from_contour_data(contour_data, n_end=4):
     contour_freqs = contour_data.iloc[:, 13:-n_end:3]
     contour_sal = contour_data.iloc[:, 14:-n_end:3]
 
-    print("contours_from_contour_data")
-    print("contour_data")
-    print(contour_data)
-    print("contour_times")
-    print(contour_times)
-    print("contour_freqs")
-    print(contour_freqs)
-    print("contour_sal")
-    print(contour_sal)
     return contour_times, contour_freqs, contour_sal
 
 
@@ -212,8 +221,6 @@ def compute_overlap(contour_data, annot_data):
         gt_segment = gt_segment[gt_segment['time'] <= times[-1]]
 
         # compute metrics
-        print('SEGMENTO')
-        print(gt_segment)
         res = mir_eval.melody.evaluate(gt_segment['time'].values,
                                        gt_segment['f0'].values, times, freqs)
 

@@ -99,7 +99,6 @@ def compute_all_overlaps(track_list, meltype):
     print(msg + ' '*num_spaces + '|')
 
     for track in track_list:
-        print("OII" + track)
         cdat, adat = get_data_files(track, meltype=meltype)
         dset_annot_dict[track] = adat.copy()
         dset_contour_dict[track] = cc.compute_overlap(cdat, adat)

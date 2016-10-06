@@ -44,7 +44,6 @@ def process(audio_files=None, training_pairs=None, testing_pairs=None,
             audio_files
         )
 
-    print("TO USANDOA QUI MERMO")
     return (
         train_contours, contour_list
         #train_contours, test_contours, contour_list
@@ -84,7 +83,6 @@ def process_with_labels(contour_extractor, feature_extractor, file_pairs):
     labels_list = []
 
     for audio_filepath, annotation in file_pairs:
-        print(audio_filepath)
         ctr = contour_extractor.compute_contours(audio_filepath)
         Y_train, _ = ctr.compute_labels(annotation)
         X_train = feature_extractor.compute_all(ctr)
