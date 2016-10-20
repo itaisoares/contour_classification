@@ -1,4 +1,6 @@
 relOutputDir="/output/CC_exper_mell"
+outputDir="/Volumes/Dados/Google Drive/Estudos/Mestrado/workspace/python/contour_classification/output/"
+melodiaOutput="/Volumes/Dados/Google Drive/Estudos/Mestrado/workspace/python/contour_classification/melodia_output/"
 projectDirName="contour_classification"
 testDataName="test_data"
 annotationsRoot="/Volumes/SAMSUNG/MedleyDB/Annotations/Melody_Annotations/"
